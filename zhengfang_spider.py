@@ -8,7 +8,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 from binascii import a2b_hex, b2a_hex
 from Crypto.Util.number import bytes_to_long
-from info_parser import parse_student_info, parse_grades, calculate_gpa
+from info_parser import parse_student_info, parse_grades, calculate_gpa, get_viewstate_values, parse_class_schedule
 
 class ZhengFangSpider:
     def __init__(self, student_id, password, student_name, base_url):
@@ -39,64 +39,65 @@ class ZhengFangSpider:
     # 含验证码登陆部分
     def login(self):
         loginurl = self.base_url + "/default2.aspx"
-        response = self.session.get(loginurl)
-        selector = etree.HTML(response.content)
-        # 获取验证码的参数
-        safe_key = selector.xpath('//*[@id="icode"]/@src')[0].split('=')[1]
-        # 获取公钥参数
-        txtKeyExponent = selector.xpath('//*[@id="txtKeyExponent"]/@value')[0]
-        txtKeyModulus = selector.xpath('//*[@id="txtKeyModulus"]/@value')[0]
-        # 加密密码
-        encrypted_password = ZhengFangSpider.encrypt_with_modulus(
-            self.password.encode('utf-8'),  # 将密码转换为字节
-            txtKeyExponent,
-            txtKeyModulus
-        )
-        cleaned_result = encrypted_password.replace("b'", "").rstrip("'")
-        __VIEWSTATE = selector.xpath('//*[@id="__VIEWSTATE"]/@value')[0]
-        __VIEWSTATEGENERATOR = selector.xpath('//*[@id="__VIEWSTATEGENERATOR"]/@value')[0]
+        max_login_attempts = 3  # 设置最大登录尝试次数
+        login_attempts = 0
+
+
+        while login_attempts < max_login_attempts:
+            response = self.session.get(loginurl)
+            selector = etree.HTML(response.content)
+
+            # 获取验证码的参数
+            safe_key = selector.xpath('//*[@id="icode"]/@src')[0].split('=')[1]
+            # 获取公钥参数
+            txtKeyExponent = selector.xpath('//*[@id="txtKeyExponent"]/@value')[0]
+            txtKeyModulus = selector.xpath('//*[@id="txtKeyModulus"]/@value')[0]
+            # 加密密码
+            encrypted_password = ZhengFangSpider.encrypt_with_modulus(
+                self.password.encode('utf-8'),  # 将密码转换为字节
+                txtKeyExponent,
+                txtKeyModulus
+            )
+            cleaned_result = encrypted_password.replace("b'", "").rstrip("'")
+            __VIEWSTATE = selector.xpath('//*[@id="__VIEWSTATE"]/@value')[0]
+            __VIEWSTATEGENERATOR = selector.xpath('//*[@id="__VIEWSTATEGENERATOR"]/@value')[0]
         
-        imgUrl = self.base_url + "/CheckCode.aspx?SafeKey=" + safe_key
-        imgresponse = self.session.get(imgUrl, stream=True)
-        image = imgresponse.content
-        DstDir = os.getcwd() + "\\"
-        print("保存验证码到：" + DstDir + "code.jpg")
-        try:
-            with open(DstDir + "code.jpg", "wb") as jpg:
-                jpg.write(image)
-        except IOError:
-            print("IO Error\n")
-        finally:
-            jpg.close()
-        # 使用 ddddocr 来识别验证码
-        ocr = ddddocr.DdddOcr()
-        code = ocr.classification(image)
-        print("识别验证码：" + code)
-        RadioButtonList1 = u"学生".encode('gb2312', 'replace')
-        data = {
-            "__LASTFOCUS": "",
-            "__VIEWSTATE": __VIEWSTATE,
-            "__VIEWSTATEGENERATOR": __VIEWSTATEGENERATOR,
-            "__EVENTTARGET": "",
-            "__EVENTARGUMENT": "",
-            "txtUserName": self.student_id,
-            "TextBox2": cleaned_result,
-            "txtSecretCode": code,
-            "RadioButtonList1": "学生",
-            "Button1": "登录",
-            "txtKeyExponent" : "010001",
-            "txtKeyModulus": txtKeyModulus
-        }
-        # 登陆教务系统
-        login_response = self.session.post(loginurl, data=data)
-        if login_response.status_code == requests.codes.ok:
-            self.is_logged_in = True
-            print("登录成功")
-            return True
-        else:
-            print("登录失败")
-            self.is_logged_in = False
-            return False
+            imgUrl = self.base_url + "/CheckCode.aspx?SafeKey=" + safe_key
+            imgresponse = self.session.get(imgUrl, stream=True)
+            image = imgresponse.content
+
+            # 使用 ddddocr 来识别验证码
+            ocr = ddddocr.DdddOcr()
+            code = ocr.classification(image)
+            print("识别验证码：" + code)
+            RadioButtonList1 = u"学生".encode('gb2312', 'replace')
+            data = {
+                "__LASTFOCUS": "",
+                "__VIEWSTATE": __VIEWSTATE,
+                "__VIEWSTATEGENERATOR": __VIEWSTATEGENERATOR,
+                "__EVENTTARGET": "",
+                "__EVENTARGUMENT": "",
+                "txtUserName": self.student_id,
+                "TextBox2": cleaned_result,
+                "txtSecretCode": code,
+                "RadioButtonList1": "学生",
+                "Button1": "登录",
+                "txtKeyExponent" : "010001",
+                "txtKeyModulus": txtKeyModulus
+            }
+            # 登陆教务系统
+            login_response = self.session.post(loginurl, data=data, allow_redirects=False)
+            if login_response.status_code == 302:
+                self.is_logged_in = True
+                print("登录成功\n")
+                return True
+            else:
+                print("登录失败，尝试重新登录\n")
+                self.is_logged_in = False
+                login_attempts += 1
+
+        print("重试登录次数达到上限，登录失败\n")
+        return False
         pass
 
 
@@ -191,6 +192,73 @@ class ZhengFangSpider:
         for year, data in year_gpa.items():
             print(f"{year} - GPA: {data['gpa']:.2f}, 总学分: {data['total_credits']}, 总绩点: {data['total_points']:.2f}")
 
+    # 课表
+    def get_student_class(self):
+        if not self.is_logged_in:
+            if not self.login():
+                print("登录失败，无法获取学生课表\n")
+                return
+        
+        # 设置请求头
+        class_url = f"{self.base_url}/xskbcx.aspx?xh={self.student_id}&xm={urllib.parse.quote(self.student_name)}&gnmkdm=N121603"
+
+        # 定义请求头
+        headers = {
+            "Host": "xk.jwc.zjsru.edu.cn",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "DNT": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Referer": f"{self.base_url}/xs_main.aspx?xh={self.student_id}",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        }
+
+        # 发送GET请求时传入headers参数
+        response = self.session.get(class_url, headers=headers)
+        if response.status_code == requests.codes.ok:
+            __VIEWSTATE, __VIEWSTATEGENERATOR = get_viewstate_values(response.text) # 获取__VIEWSTATE, __VIEWSTATEGENERATOR
+            student_class = parse_class_schedule(response.text)
+            self.student_class = student_class
+            print("\n当前学期课表：\n" + self.student_class)
+        else:
+            print("获取信息失败\n")
+        
+        # 提交获取课表的POST请求 用来获取过去的课表
+        data = {
+            "__EVENTTARGET": "xqd",
+            "__EVENTARGUMENT": "",
+            "__LASTFOCUS": "",
+            "__VIEWSTATE": __VIEWSTATE,
+            "__VIEWSTATEGENERATOR" : __VIEWSTATEGENERATOR,
+            "xnd": "2023-2024",  # 可根据需要设置学年
+            "xqd": "1",  # 可根据需要设置学期 若不想查看过去课表，则设置为最新学期即可
+        }
+        # 定义请求头
+        headers = {
+            "Host": "xk.jwc.zjsru.edu.cn",
+            "Connection": "keep-alive",
+            "Content-Length": '1468',
+            "Cache-Control": "max-age=0",
+            "Origin": "http://xk.jwc.zjsru.edu.cn",
+            "DNT": "1",
+            "Upgrade-Insecure-Requests": "1",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Referer": f"{self.base_url}/xskbcx.aspx?xh={self.student_id}&xm={urllib.parse.quote(self.student_name)}&gnmkdm=N121603",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        }
+        response = self.session.post(class_url, data=data, headers=headers)
+        if response.status_code == requests.codes.ok:
+            student_class_past = parse_class_schedule(response.text)
+            self.student_class_past = student_class_past
+            print("\n过往学期课表：\n" + self.student_class_past)
+        else:
+            print("课表获取失败\n")
+        pass
 
 
 
