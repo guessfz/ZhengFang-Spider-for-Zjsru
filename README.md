@@ -18,15 +18,19 @@
 
 ### 1. 获取信息
 
-- 使用 `run_spider.py` 脚本可以登录教务系统并获取学生信息和成绩信息。
+-  `get_student_info` 可以登录教务系统并获取学生信息。`get_student_grades`可以获取成绩信息。
 
 ### 2. 计算GPA
 
-- `run_spider.py` 脚本还可用于计算学期和学年GPA。
+-  `calculate_and_print_gpa` 可以计算学期和学年GPA。
 
-### 3. 成绩监控
+### 3. 查看课表
 
-- 您可以通过定时运行 `gradeMonitor.py` 脚本，设置成绩更新的监控，当成绩有变化时，会发送通知提醒您。
+-  `get_student_class` 脚本可以查看当前和过去的课表。
+
+### 4. 成绩监控
+
+- 通过定时运行 `gradeMonitor.py` 脚本，您可以监控成绩更新，当成绩有变化时，会发送通知提醒您。
 
 
 #### PushPlus通知配置
@@ -34,11 +38,11 @@
 - 如果您需要通过PushPlus发送通知，可以按照以下步骤配置PushPlus Token：
 
    - 登录 [PushPlus](https://www.pushplus.plus/)
-   - 在 [Token页面](https://www.pushplus.plus/api/open/user/token) 复制您的Token
+   - 在 [Token页面](https://www.pushplus.plus/api/open/user/token) 复制您的Token。
 
 ### 注意事项
 
-- 由于验证码有概率识别错误，如果登录失败，请尝试重新运行脚本。
+- 由于验证码有概率识别错误，您可以通过修改`zhengfang_spider.py`中的`max_login_attempts`来自定义尝试重新登录次数。
 
 - 如果您的教务系统登录页面包含验证码，且验证码的图片链接为 `xxxxxx/CheckCode.aspx?SafeKey=97198bdf1f2143059f3ccf570c7c10b1`，则大概率可以使用此工具。
 
