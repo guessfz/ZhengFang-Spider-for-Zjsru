@@ -41,3 +41,7 @@
 - 由于验证码有概率识别错误，如果登录失败，请尝试重新运行脚本。
 
 - 如果您的教务系统登录页面包含验证码，且验证码的图片链接为 `xxxxxx/CheckCode.aspx?SafeKey=97198bdf1f2143059f3ccf570c7c10b1`，则大概率可以使用此工具。
+
+## 许可证
+
+这个工具基于 MIT 许可证进行分发。有关详细信息，请参阅 [LICENSE]([LICENSE](https://github.com/gufei233/ZhengFang-Spider-for-Zjsru/blob/main/LICENSE)https://github.com/gufei233/ZhengFang-Spider-for-Zjsru/blob/main/LICENSE) 文件。
