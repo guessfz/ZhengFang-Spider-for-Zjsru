@@ -44,4 +44,4 @@
 
 ## 许可证
 
-这个工具基于 MIT 许可证进行分发。有关详细信息，请参阅 [LICENSE](https://github.com/gufei233/ZhengFang-Spider-for-Zjsru/blob/main/LICENSE)https://github.com/gufei233/ZhengFang-Spider-for-Zjsru/blob/main/LICENSE) 文件。
+这个工具基于 MIT 许可证进行分发。有关详细信息，请参阅 [LICENSE](https://github.com/gufei233/ZhengFang-Spider-for-Zjsru/blob/main/LICENSE) 文件。
