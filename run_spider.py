@@ -27,3 +27,6 @@ pretty_print_student_grades(spider.grades)     # 美观打印学生成绩 若不
 
 # 计算gpa并打印 若不需要则注释下行代码
 spider.calculate_and_print_gpa()
+
+# 课表
+#spider.get_student_class()
