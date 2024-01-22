@@ -125,7 +125,7 @@ def parse_class_schedule(html_content):
             day_of_week = day_mapping.get(day_of_week_str, 'Unknown')
             period = day_period_week.split('第')[1].split('节')[0]  
             week = day_period_week[day_period_week.find("{")+1:day_period_week.find("}")]  
-                        teacher = details[2]
+            teacher = details[2]
             location = details[3] if len(details) > 3 else '未知'
             time = details[4] if len(details) > 4 else ''
 
